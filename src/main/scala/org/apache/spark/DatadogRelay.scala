@@ -12,7 +12,7 @@ import org.apache.spark.util.{Utils, JsonProtocol}
 import org.json4s.JsonAST.{JObject, JNothing, JValue}
 
 import github.gphat.datadog._
-import org.apache.spark.scheduler.{SparkListenerEvent, SparkListenerApplicationStart, SparkListenerApplicationEnd}
+import org.apache.spark.scheduler._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
@@ -24,10 +24,21 @@ class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
     val m: Option[Metric] = (event match {
       case e: SparkListenerApplicationStart =>        
         val seq = Seq((e.time / 1000, 1d))
-        Some(Metric("spark.firehose.applicationsStarted", seq, Some("counter"), None, None))
+        Some(Metric("spark.firehose.applicationStarted", seq, Some("counter"), None, None))
       case e: SparkListenerApplicationEnd =>
         val seq = Seq((e.time / 1000, 1d))
-        Some(Metric("spark.firehose.applicationsEnded", seq, Some("counter"), None, None))
+        Some(Metric("spark.firehose.applicationEnded", seq, Some("counter"), None, None))
+      case e: SparkListenerJobStart =>
+        val seq = Seq((e.time / 1000, 1d))
+        Some(Metric("spark.firehose.jobStarted", seq, Some("counter"), None, None))
+      case e: SparkListenerJobEnd =>
+        val seq = Seq((e.time / 1000, 1d))
+        Some(Metric("spark.firehose.jobEnded", seq, Some("counter"), None, None))
+      case e: SparkListenerStageSubmitted =>
+        e.stageInfo.submissionTime.map { time =>
+          val seq = Seq((time / 1000, 1d))
+          Metric("spark.firehose.stageStarted", seq, Some("counter"), None, None)
+        }
       case _ => None
     })
     
