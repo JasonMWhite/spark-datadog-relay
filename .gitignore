@@ -6,3 +6,4 @@ target
 .classpath
 .project
 .cache-tests
+.tmpBin
