@@ -29,18 +29,18 @@ class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
   }
   
   def stageCompletedMetrics(e: SparkListenerStageCompleted): Option[Seq[Metric]] = {
-    e.stageInfo.completionTime.flatMap { completionTime =>
+    e.stageInfo.completionTime.map { completionTime =>
       val completionSeconds = completionTime / 1000
       val processingMetric: Option[Metric] = e.stageInfo.submissionTime.map { submissionTime =>
         generateCounter("spark.firehose.stageProcessingTime", completionTime / 1000, amount = (completionSeconds - submissionTime / 1000).doubleValue())
       }
-      val retryMetric: Option[Metric] = Some(generateCounter("spark.firehose.stageRetryCount", completionSeconds, amount = e.stageInfo.attemptId.toDouble))
+      val retryMetric = Some(generateCounter("spark.firehose.stageRetryCount", completionSeconds, amount = e.stageInfo.attemptId.toDouble))
       val completionMetric = Some(generateCounter("spark.firehose.stageEnded", completionSeconds))
       val failureMetric = e.stageInfo.failureReason.map { _ =>
         generateCounter("spark.firehose.stageFailed", completionSeconds)
       }
       
-      Some(Seq(processingMetric, retryMetric, completionMetric, failureMetric).flatten)
+      Seq(processingMetric, retryMetric, completionMetric, failureMetric).flatten
     }
   }
   
