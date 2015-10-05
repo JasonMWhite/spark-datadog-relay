@@ -13,6 +13,7 @@ import org.json4s.JsonAST.{JObject, JNothing, JValue}
 
 import github.gphat.datadog._
 import org.apache.spark.scheduler._
+import org.apache.spark.executor._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
@@ -43,50 +44,66 @@ class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
       Seq(processingMetric, retryMetric, completionMetric, failureMetric).flatten
     }
   }
-  
-  def taskEndMetrics(e: SparkListenerTaskEnd): Option[Seq[Metric]] = {
-    val finishSeconds = e.taskInfo.finishTime / 1000
 
-    val taskMetrics: Seq[Metric] = Seq(
+  def taskInputMetrics(finishSeconds: Long, inputMetrics: Option[InputMetrics]): Seq[Metric] = {
+    inputMetrics.map { metrics =>
+      Seq(
+        generateCounter("spark.firehose.taskInputBytesRead", finishSeconds, amount = metrics.bytesRead),
+        generateCounter("spark.firehose.taskInputRecordsRead", finishSeconds, amount = metrics.recordsRead)
+      )
+    }.getOrElse(Seq())
+  }
+  
+  def taskShuffleReadMetrics(finishSeconds: Long, shuffleReadMetrics: Option[ShuffleReadMetrics]): Seq[Metric] = {
+    shuffleReadMetrics.map { metrics =>
+      Seq(
+        generateCounter("spark.firehose.taskShuffleBytesRead", finishSeconds, amount = metrics.totalBytesRead),
+        generateCounter("spark.firehose.taskShuffleRecordsRead", finishSeconds, amount = metrics.recordsRead)
+      )
+    }.getOrElse(Seq())
+  }
+  
+  def taskShuffleWriteMetrics(finishSeconds: Long, shuffleWriteMetrics: Option[ShuffleWriteMetrics]): Seq[Metric] = {
+    shuffleWriteMetrics.map { metrics =>
+      Seq(
+        generateCounter("spark.firehose.taskShuffleBytesWritten", finishSeconds, amount = metrics.shuffleBytesWritten),
+        generateCounter("spark.firehose.taskShuffleRecordsWritten", finishSeconds, amount = metrics.shuffleRecordsWritten)
+      )
+    }.getOrElse(Seq())
+  }
+  
+  def taskOutputMetrics(finishSeconds: Long, outputMetrics: Option[OutputMetrics]): Seq[Metric] = {
+    outputMetrics.map { metrics =>
+      Seq(
+        generateCounter("spark.firehose.taskOutputBytesWritten", finishSeconds, amount = metrics.bytesWritten),
+        generateCounter("spark.firehose.taskOutputRecordsWritten", finishSeconds, amount = metrics.recordsWritten)
+      )
+    }.getOrElse(Seq())
+  }
+  
+  def taskEndBaseMetrics(finishSeconds: Long, e: SparkListenerTaskEnd): Seq[Metric] = {
+    Seq(
       Some(generateCounter("spark.firehose.taskEnded", finishSeconds)),
-      Some(generateCounter("spark.firehose.taskDuration", finishSeconds, amount = e.taskInfo.duration)),
+      Some(generateCounter("spark.firehose.taskDuration", finishSeconds, amount = e.taskInfo.duration / 1000)),
       if (e.taskInfo.successful) None else Some(generateCounter("spark.firehose.taskFailed", finishSeconds)),
       Some(generateCounter("spark.firehose.taskDiskBytesSpilled", finishSeconds, amount = e.taskMetrics.diskBytesSpilled)),
       Some(generateCounter("spark.firehose.taskMemoryBytesSpilled", finishSeconds, amount = e.taskMetrics.memoryBytesSpilled)),
-      Some(generateCounter("spark.firehose.taskExecutorRunTime", finishSeconds, amount = e.taskMetrics.executorRunTime)),
-      Some(generateCounter("spark.firehose.taskResultSerializationTime", finishSeconds, amount = e.taskMetrics.resultSerializationTime)),
+      Some(generateCounter("spark.firehose.taskExecutorRunTime", finishSeconds, amount = e.taskMetrics.executorRunTime / 1000)),
+      Some(generateCounter("spark.firehose.taskResultSerializationTime", finishSeconds, amount = e.taskMetrics.resultSerializationTime / 1000)),
       Some(generateCounter("spark.firehose.taskBytesSentToDriver", finishSeconds, amount = e.taskMetrics.resultSize))
     ).flatten
+  }
+  
+  def taskEndMetrics(e: SparkListenerTaskEnd): Option[Seq[Metric]] = {
+    val finishSeconds = e.taskInfo.finishTime / 1000
     
-    val taskInputMetrics: Seq[Metric] = e.taskMetrics.inputMetrics.map { inputMetrics =>
-      Seq(
-        generateCounter("spark.firehose.taskInputBytesRead", finishSeconds, amount = inputMetrics.bytesRead),
-        generateCounter("spark.firehose.taskInputRecordsRead", finishSeconds, amount = inputMetrics.recordsRead)
-      )
-    }.getOrElse(Seq())
-    
-    val taskShuffleReadMetrics: Seq[Metric] = e.taskMetrics.shuffleReadMetrics.map { shuffleReadMetrics =>
-      Seq(
-        generateCounter("spark.firehose.taskShuffleBytesRead", finishSeconds, amount = shuffleReadMetrics.totalBytesRead),
-        generateCounter("spark.firehose.taskShuffleRecordsRead", finishSeconds, amount = shuffleReadMetrics.recordsRead)
-      )
-    }.getOrElse(Seq())
-    
-    val taskShuffleWriteMetrics: Seq[Metric] = e.taskMetrics.shuffleWriteMetrics.map { shuffleWriteMetrics =>
-      Seq(
-        generateCounter("spark.firehose.taskShuffleBytesWritten", finishSeconds, amount = shuffleWriteMetrics.shuffleBytesWritten),
-        generateCounter("spark.firehose.taskShuffleRecordsWritten", finishSeconds, amount = shuffleWriteMetrics.shuffleRecordsWritten)
-      )
-    }.getOrElse(Seq())
-    
-    val taskOutputMetrics: Seq[Metric] = e.taskMetrics.outputMetrics.map { outputMetrics =>
-      Seq(
-        generateCounter("spark.firehose.taskOutputBytesWritten", finishSeconds, amount = outputMetrics.bytesWritten),
-        generateCounter("spark.firehose.taskOutputRecordsWritten", finishSeconds, amount = outputMetrics.recordsWritten)
-      )
-    }.getOrElse(Seq())
-    
-    Some(Seq(taskMetrics, taskInputMetrics, taskShuffleReadMetrics, taskShuffleWriteMetrics, taskOutputMetrics).flatten)
+    Some(Seq(
+        taskEndBaseMetrics(finishSeconds, e),
+        taskInputMetrics(finishSeconds, e.taskMetrics.inputMetrics),
+        taskShuffleReadMetrics(finishSeconds, e.taskMetrics.shuffleReadMetrics),
+        taskShuffleWriteMetrics(finishSeconds, e.taskMetrics.shuffleWriteMetrics),
+        taskOutputMetrics(finishSeconds, e.taskMetrics.outputMetrics)
+    ).flatten)
   }
   
   override def onEvent(event: SparkListenerEvent): Unit = {
