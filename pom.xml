@@ -5,7 +5,7 @@
   <groupId>com.shopify</groupId>
   <artifactId>spark-datadog-relay</artifactId>
   <packaging>jar</packaging>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.1</version>
   <name>Datadog Relay for Spark</name>
 
   <properties>
