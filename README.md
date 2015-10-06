@@ -13,7 +13,7 @@ To connect it to Spark, add the appropriate flags to `spark-shell`. For example:
 ./bin/spark-shell --master local[4] --driver-class-path /path/to/repo/spark-datadog-relay/target/datadog-relay-version.jar --conf spark.extraListeners=org.apache.spark.DatadogRelay
 ```
 
-Alternatively, you can use the excellent (jitpack)[https://jitpack.io/#JasonMWhite/spark-datadog-relay]:
+Alternatively, you can use the excellent [jitpack](https://jitpack.io/#JasonMWhite/spark-datadog-relay):
 ```
 ./bin/spark-shell --master local[4] --repositories https://jitpack.io --packages com.github.JasonMWhite:spark-datadog-relay:version --conf spark.extraListeners=org.apache.spark.DatadogRelay
 ```
