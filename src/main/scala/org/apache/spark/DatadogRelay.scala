@@ -16,18 +16,21 @@ import org.apache.spark.scheduler._
 import org.apache.spark.executor._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import org.apache.spark.tagUtils._
-
 class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
   
-  implicit val tags: List[String] = {
+  val tags: List[String] = {
     val datadogTags = conf.get("spark.datadog.tags", "")
     if (datadogTags == "") List() else datadogTags.split(",").toList
   }
   
   val statsdOption: Option[NonBlockingStatsDClient] = {
     try {
-      Some(new NonBlockingStatsDClient("spark", "localhost", 8125)) 
+      Some(new NonBlockingStatsDClient(
+          "spark",
+          "localhost",
+          8125,
+          tags.mkString(",")
+      ))
     } catch {
       case ex: StatsDClientException => None
       case ex: Exception => throw ex
