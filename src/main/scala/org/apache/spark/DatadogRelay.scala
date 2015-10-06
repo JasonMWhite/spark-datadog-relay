@@ -21,8 +21,8 @@ import org.apache.spark.tagUtils._
 class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
   
   implicit val tags: List[String] = {
-    val datadogTags = conf.get("spark.datadog.tags")
-    datadogTags.split(",").toList
+    val datadogTags = conf.get("spark.datadog.tags", "")
+    if (datadogTags == "") List() else datadogTags.split(",").toList
   }
   
   val statsdOption: Option[NonBlockingStatsDClient] = {
