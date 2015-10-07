@@ -41,11 +41,13 @@ class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
     statsd.incrementCounter("firehose.taskEnded")
     statsd.recordExecutionTime("firehose.taskDuration", e.taskInfo.duration)
     if (!e.taskInfo.successful) statsd.incrementCounter("firehose.taskFailed")
-    statsd.count("firehose.taskDiskBytesSpilled", e.taskMetrics.diskBytesSpilled)
-    statsd.count("firehose.taskMemoryBytesSpilled", e.taskMetrics.memoryBytesSpilled)
-    statsd.recordExecutionTime("firehose.taskExecutorRunTime", e.taskMetrics.executorRunTime)
-    statsd.recordExecutionTime("firehose.taskResultSerializationTime", e.taskMetrics.resultSerializationTime)
-    statsd.count("firehose.taskBytesSentToDriver", e.taskMetrics.resultSize)
+    if (e.taskMetrics != null) {
+      statsd.count("firehose.taskDiskBytesSpilled", e.taskMetrics.diskBytesSpilled)
+      statsd.count("firehose.taskMemoryBytesSpilled", e.taskMetrics.memoryBytesSpilled)
+      statsd.recordExecutionTime("firehose.taskExecutorRunTime", e.taskMetrics.executorRunTime)
+      statsd.recordExecutionTime("firehose.taskResultSerializationTime", e.taskMetrics.resultSerializationTime)
+      statsd.count("firehose.taskBytesSentToDriver", e.taskMetrics.resultSize)
+    }
   }
   
   def taskInputMetrics(statsd: NonBlockingStatsDClient, metrics: InputMetrics): Unit = {
@@ -99,10 +101,12 @@ class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
           statsd.recordGaugeValue("firehose.taskRetryCount", e.taskInfo.attempt)
         case e: SparkListenerTaskEnd =>
           taskBaseMetrics(statsd, e)
-          e.taskMetrics.inputMetrics.foreach { m => taskInputMetrics(statsd, m) }
-          e.taskMetrics.shuffleReadMetrics.foreach { m => taskShuffleReadMetrics(statsd, m) }
-          e.taskMetrics.shuffleWriteMetrics.foreach { m => taskShuffleWriteMetrics(statsd, m) }
-          e.taskMetrics.outputMetrics.foreach { m => taskOutputMetrics(statsd, m) }
+          if (e.taskMetrics != null) {
+            e.taskMetrics.inputMetrics.foreach { m => taskInputMetrics(statsd, m) }
+            e.taskMetrics.shuffleReadMetrics.foreach { m => taskShuffleReadMetrics(statsd, m) }
+            e.taskMetrics.shuffleWriteMetrics.foreach { m => taskShuffleWriteMetrics(statsd, m) }
+            e.taskMetrics.outputMetrics.foreach { m => taskOutputMetrics(statsd, m) }
+          }
         case e: SparkListenerExecutorAdded =>
           statsd.incrementCounter("firehose.executorAdded")
           statsd.count("firehose.executorCoresAdded", e.executorInfo.totalCores)
