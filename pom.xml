@@ -5,7 +5,7 @@
   <groupId>com.shopify</groupId>
   <artifactId>spark-datadog-relay</artifactId>
   <packaging>jar</packaging>
-  <version>0.2</version>
+  <version>0.3</version>
   <name>Datadog Relay for Spark</name>
 
   <properties>
@@ -46,6 +46,11 @@
 	  <artifactId>scalatest_${scala.version.prefix}</artifactId>
 	  <version>2.2.4</version>
 	  <scope>test</scope>
+	</dependency>
+	<dependency>
+	  <groupId>org.apache.spark</groupId>
+	  <artifactId>spark-streaming_2.10</artifactId>
+	  <version>1.5.1</version>
 	</dependency>
   </dependencies>
 
