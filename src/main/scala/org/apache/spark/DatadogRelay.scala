@@ -18,24 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
   
-  val tags: List[String] = {
-    val datadogTags = conf.get("spark.datadog.tags", "")
-    if (datadogTags == "") List() else datadogTags.split(",").toList
-  }
-  
-  val statsdOption: Option[NonBlockingStatsDClient] = {
-    try {
-      Some(new NonBlockingStatsDClient(
-          "spark",
-          "localhost",
-          8125,
-          tags.mkString(",")
-      ))
-    } catch {
-      case ex: StatsDClientException => None
-      case ex: Exception => throw ex
-    }
-  }
+  val statsdOption: Option[NonBlockingStatsDClient] = SparkStatsDHelper.getClient(conf)
   
   def taskBaseMetrics(statsd: NonBlockingStatsDClient, e: SparkListenerTaskEnd): Unit = {
     statsd.incrementCounter("firehose.taskEnded")
