@@ -81,14 +81,14 @@ class DatadogRelay(conf: SparkConf) extends SparkFirehoseListener {
           }
         case e: SparkListenerTaskStart =>
           statsd.incrementCounter("firehose.taskStarted")
-          statsd.recordGaugeValue("firehose.taskRetryCount", e.taskInfo.attempt)
+          statsd.recordGaugeValue("firehose.taskRetryCount", e.taskInfo.attemptNumber)
         case e: SparkListenerTaskEnd =>
           taskBaseMetrics(statsd, e)
           if (e.taskMetrics != null) {
-            e.taskMetrics.inputMetrics.foreach { m => taskInputMetrics(statsd, m) }
-            e.taskMetrics.shuffleReadMetrics.foreach { m => taskShuffleReadMetrics(statsd, m) }
-            e.taskMetrics.shuffleWriteMetrics.foreach { m => taskShuffleWriteMetrics(statsd, m) }
-            e.taskMetrics.outputMetrics.foreach { m => taskOutputMetrics(statsd, m) }
+            taskInputMetrics(statsd, e.taskMetrics.inputMetrics)
+            taskShuffleReadMetrics(statsd, e.taskMetrics.shuffleReadMetrics)
+            taskShuffleWriteMetrics(statsd, e.taskMetrics.shuffleWriteMetrics)
+            taskOutputMetrics(statsd, e.taskMetrics.outputMetrics)
           }
         case e: SparkListenerExecutorAdded =>
           statsd.incrementCounter("firehose.executorAdded")
